@@ -1,4 +1,5 @@
 package verify.product.csv;
+
 import java.awt.Desktop;
 import java.io.BufferedReader;
 import java.io.File;
@@ -39,18 +40,25 @@ public class CheckProductTable {
 	private static String errorMessages;
 	private static String BadChar = " ";
 	private static int needsUpdatingcount = 0;
+	private static String prevInternalID = "";
+	private static int internalIDIgnored = 0;
+	private static int categoryIdEmpty;
+	private static int deptCodeEmpty;
+	private static int statusIsEmpty;
+	private static int weightIsEmpty;
+	private static int nonFabricMeasuredPerYard;
+	private static int ProductTitleIsEmpty;
 
 	public static void main(String[] args) throws ClassNotFoundException, IOException {
 
 		processCSVfile(chooseCSVfile());
-
 		System.out.println("Goodbye!");
 	}// end main
 
 	private static boolean productIsFabric(String categories) {
 		if (categories.isEmpty())
 			return (false);
-		System.out.println("Categories:  " + categories);
+//		System.out.println("Categories:  " + categories);
 		Integer[] arrayTwo = { 0, 0, 0, 0, 0, 0, 0, 0 };
 		String[] parts = categories.substring(4).split(",");
 		for (int i = 0; i < parts.length; i++) {
@@ -60,10 +68,10 @@ public class CheckProductTable {
 		Set<Integer> thisCategory = new LinkedHashSet<Integer>(Arrays.asList(arrayTwo));
 		for (Integer thisProductCatgory : thisCategory) {
 			if (!fabricCategories.add(thisProductCatgory)) {
-				System.out.println("This category is a fabric " + thisProductCatgory);
+//				System.out.println("This category is a fabric " + thisProductCatgory);
 				return (true);
 			} else {
-				System.out.println("This category is Not fabric " + thisProductCatgory);
+//				System.out.println("This category is Not fabric " + thisProductCatgory);
 				fabricCategories.remove(thisProductCatgory);
 			}
 		}
@@ -113,30 +121,46 @@ public class CheckProductTable {
 					// displayInBrowser(record.get("Short Description"));
 				}
 				// System.out.println("record size is "+record.size());
-				boolean needsUpdating = checkThisProduct(record.get("Internal ID(Do Not Change)"),
-						record.get("Category IDs (Comma separate)"), record.get("Dept Code"), record.get("Status"),
-						record.get("Product Title"), record.get("Short Description"),
-						// record.get("Long Description"),
-						record.get("Unit of Measurement(each/per yard)"), record.get("Availability(web/store/both)"),
-						record.get(10), record.get("Unlimited Inventory(yes/no)"), record.get("Options"),
-						record.get("Assigned option values"), record.get("Option ID(Do Not Change)"), record.get("sku"),
-						record.get("upc"), record.get("Manufacturer Product Id"), record.get("Alternate Lookups"),
-						record.get("Manufacturer Id"), record.get("Preferred Vendor"), record.get("Store Location ID"),
-						record.get("Weight"), record.get("Price"), record.get("Sale Price"),
-						record.get("Wholesale Price"), record.get("Website Price"), record.get("Website Sale Price"),
-						record.get("Re-Order Point"), record.get("Re-Order Amount"), record.get("Tax Code"),
-						record.get("Date Added"));
-				if (needsUpdating) {
-					needsUpdatingcount++;
-					printer.print("=\"" + errorMessages + "\"");
-					printer.printRecord(record);
+				if (prevInternalID.equals(record.get("Internal ID(Do Not Change)"))) {
+					internalIDIgnored++;
+				} else {
+//					System.out.println("prevInternalID is '" + prevInternalID + "'");
+//					System.out.println("currInternalID is '" + record.get("Internal ID(Do Not Change)") + "'");
+					prevInternalID = record.get("Internal ID(Do Not Change)");
+					boolean needsUpdating = checkThisProduct(record.get("Internal ID(Do Not Change)"),
+							record.get("Category IDs (Comma separate)"), record.get("Dept Code"), record.get("Status"),
+							record.get("Product Title"), record.get("Short Description"),
+							// record.get("Long Description"),
+							record.get("Unit of Measurement(each/per yard)"),
+							record.get("Availability(web/store/both)"), record.get(10),
+							record.get("Unlimited Inventory(yes/no)"), record.get("Options"),
+							record.get("Assigned option values"), record.get("Option ID(Do Not Change)"),
+							record.get("sku"), record.get("upc"), record.get("Manufacturer Product Id"),
+							record.get("Alternate Lookups"), record.get("Manufacturer Id"),
+							record.get("Preferred Vendor"), record.get("Store Location ID"), record.get("Weight"),
+							record.get("Price"), record.get("Sale Price"), record.get("Wholesale Price"),
+							record.get("Website Price"), record.get("Website Sale Price"), record.get("Re-Order Point"),
+							record.get("Re-Order Amount"), record.get("Tax Code"), record.get("Date Added"));
+					if (needsUpdating) {
+						needsUpdatingcount++;
+						printer.print("=\"" + errorMessages + "\"");
+						printer.printRecord(record);
+					}
 				}
-				// }
 			}
 			;
 		}
+		System.out.println("=================================================================");
 		System.out.println("number of short records was " + shortRecords);
-		System.out.println(" products to be updated is  " + needsUpdatingcount);
+		System.out.println("products to be updated is  " + needsUpdatingcount);
+		System.out.println("Product Option lines ignored " + internalIDIgnored);
+		System.out.println("categoryIdEmpty     : " + categoryIdEmpty);
+		System.out.println("DeptCodeEmpty       : " + deptCodeEmpty);
+		System.out.println("statusIsEmpty       : " + statusIsEmpty);
+		System.out.println("weightIsEmpty       : " + weightIsEmpty);
+		System.out.println("ProductTitleIsEmpty : " + ProductTitleIsEmpty);
+		
+		System.out.println("nonFabricMeasuredPerYard : " + nonFabricMeasuredPerYard);
 		writer.close();
 		System.exit(1);
 	}
@@ -172,64 +196,59 @@ public class CheckProductTable {
 		// 5. UnitOfMeasurement <> yard and Category == Fabric
 		errorMessages = " ";
 
-		// if (CategoryIDs.isEmpty()) {
-		// errorMessages = errorMessages + "CategoryIDs.isEmpty, ";
-		// }
-		// if (DeptCode.isEmpty()) {
-		// errorMessages = errorMessages + "DeptCode.isEmpty, ";
-		// }
-		// if (Status.isEmpty()) {
-		// errorMessages = errorMessages + "Status.isEmpty, ";
-		// }
-		// if (ProductTitle.isEmpty()) {
-		// errorMessages = errorMessages + "ProductTitle.isEmpty, ";
-		// }
+		if (CategoryIDs.isEmpty()) {
+			errorMessages = errorMessages + "CategoryIDs.isEmpty, ";
+			categoryIdEmpty++;
+		}
+		if (DeptCode.isEmpty()) {
+			errorMessages = errorMessages + "DeptCode.isEmpty, ";
+			deptCodeEmpty++;
+		}
+		if (Status.isEmpty()) {
+			errorMessages = errorMessages + "Status.isEmpty, ";
+			statusIsEmpty++;
+		}
+		 if (ProductTitle.isEmpty()) {
+		 errorMessages = errorMessages + "ProductTitle.isEmpty, ";
+		 ProductTitleIsEmpty++;
+		 }
 		// if (UnlimitedInventory.isEmpty()) {
 		// errorMessages = errorMessages + "UnlimitedInventory.isEmpty, ";
 		// }
-		// if (Weight.isEmpty()) {
-		// errorMessages = errorMessages + "Weight.isEmpty, ";
-		// }
-		 if (ShortDescription.contains(BadChar)){
-		 errorMessages=errorMessages+"ShortDescription contains badchar, ";
-		 }
+		if (Weight.isEmpty()) {
+			errorMessages = errorMessages + "Weight.isEmpty, ";
+			weightIsEmpty++;
+		}
+		if (ShortDescription.contains(BadChar)) {
+			errorMessages = errorMessages + "ShortDescription contains badchar, ";
+		}
 		// if (LongDescription.contains(BadChar)){
 		// errorMessages=errorMessages+"LongDescription contains badchar, ";
 		// }
 		if (productIsFabric(CategoryIDs) && !UnitOfMeasurement.contains("per yard")) {
-			if (ProductTitle.contains("kit") 
-					|| ProductTitle.contains("Fat Eighth") 
-					|| ProductTitle.contains("pre cut")
-					|| ProductTitle.contains("LC") 
-					|| ProductTitle.contains("Layer Cake") 
-					|| ProductTitle.contains("JR") 
-					|| ProductTitle.contains("Jelly Roll") 
-					|| ProductTitle.contains("kit") 
-					
-					|| ShortDescription.contains("kit")
-					|| ShortDescription.contains("JR") 
-					|| ShortDescription.contains("Jelly Roll") 
-					|| ShortDescription.contains("LC")
-					|| ShortDescription.contains("Layer Cake")
-					|| ShortDescription.contains("pre cut") 
-				){
+			if (ProductTitle.contains("kit") || ProductTitle.contains("Fat Eighth") || ProductTitle.contains("pre cut")
+					|| ProductTitle.contains("LC") || ProductTitle.contains("Layer Cake") || ProductTitle.contains("JR")
+					|| ProductTitle.contains("Jelly Roll") || ProductTitle.contains("kit")
+
+					|| ShortDescription.contains("kit") || ShortDescription.contains("JR")
+					|| ShortDescription.contains("Jelly Roll") || ShortDescription.contains("LC")
+					|| ShortDescription.contains("Layer Cake") || ShortDescription.contains("pre cut")) {
 			} else
 				errorMessages = errorMessages + "Fabric is not measured per yard, ";
 		}
-		// if (!productIsFabric(CategoryIDs) && UnitOfMeasurement.contains("per
-		// yard")) {
-		// errorMessages = errorMessages + "non-Fabric is measured per yard, ";
-		// }
+		if (!productIsFabric(CategoryIDs) && UnitOfMeasurement.contains("per yard")) {
+			errorMessages = errorMessages + "non-Fabric is measured per yard, ";
+			nonFabricMeasuredPerYard++;
+		}
 		if (errorMessages.length() == 1) {
 			return false;
 		} else {
-			// System.out.println(errorMessages);
+			System.out.println(errorMessages);
 			return true;
 		}
 	}
 
 	private static String trim(String string) {
-		// TODO Auto-generated method stub
 		int length = string.length() - 1;
 		System.out.println(string.substring(2, length));
 		return string.substring(2, length);
