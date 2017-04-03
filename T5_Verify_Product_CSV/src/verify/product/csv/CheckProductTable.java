@@ -7,9 +7,11 @@ import java.io.OutputStreamWriter;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.Set;
 import java.nio.charset.Charset;
 import java.util.Arrays;
@@ -37,6 +39,7 @@ public class CheckProductTable {
 			430, 431, 432, 433, 434, 435, 437, 438, 439, 440, 441, 442, 444, 445, 447, 448, 449, 450, 451, 452, 453,
 			454, 455, 456, 457, 459, 460, 493, 494, 495, 500, 501, 502, 504, 506, 507 };
 	private static String regexSpace = "[ $]+";
+	private static String regexHtml = "^[<p]+";
 	private static String errorMessages;
 	private static String BadChar = " ";
 	private static int needsUpdatingcount = 0;
@@ -48,17 +51,41 @@ public class CheckProductTable {
 	private static int weightIsEmpty;
 	private static int nonFabricMeasuredPerYard;
 	private static int ProductTitleIsEmpty;
+	private static int badCharInDescription;
+	private static int fabricNotMeasuredPerYard;
+	private static int browserDisplayCount;
+	private static String inCSVFileName = "/Users/geoffn/Downloads/4872-edit-products-56.csv";
+	private static String outCSVFileName = "/Users/geoffn/Downloads/4872-edit-products-56-Updated.csv";
+	private static String htmlShortFileName = "/Users/geoffn/Downloads/testOutShort.html";
+	private static String trucatedShortFileName = "/Users/geoffn/Downloads/testOutTruncatedShort.html";
+	private static String htmlLongFileName = "/Users/geoffn/Downloads/testOutLong.html";
+	private static String prevInString = " ";
+	private static int counterShortDescHasHtml;
 
 	public static void main(String[] args) throws ClassNotFoundException, IOException {
+		File htmlShortFile = new File(htmlShortFileName);
+		String separator = "<br>---------Beginning---------------<br>";
+		Files.write(htmlShortFile.toPath(), separator.getBytes());
+
+		File truncatedShortFile = new File(trucatedShortFileName);
+		Files.write(truncatedShortFile.toPath(), separator.getBytes());
+
+		File htmlLongFile = new File(htmlLongFileName);
+		Files.write(htmlLongFile.toPath(), separator.getBytes());
 
 		processCSVfile(chooseCSVfile());
+		
+		Desktop.getDesktop().browse(htmlShortFile.toURI());
+		Desktop.getDesktop().browse(truncatedShortFile.toURI());
+		Desktop.getDesktop().browse(htmlLongFile.toURI());
+
 		System.out.println("Goodbye!");
 	}// end main
 
 	private static boolean productIsFabric(String categories) {
 		if (categories.isEmpty())
 			return (false);
-//		System.out.println("Categories:  " + categories);
+		// System.out.println("Categories: " + categories);
 		Integer[] arrayTwo = { 0, 0, 0, 0, 0, 0, 0, 0 };
 		String[] parts = categories.substring(4).split(",");
 		for (int i = 0; i < parts.length; i++) {
@@ -68,10 +95,12 @@ public class CheckProductTable {
 		Set<Integer> thisCategory = new LinkedHashSet<Integer>(Arrays.asList(arrayTwo));
 		for (Integer thisProductCatgory : thisCategory) {
 			if (!fabricCategories.add(thisProductCatgory)) {
-//				System.out.println("This category is a fabric " + thisProductCatgory);
+				// System.out.println("This category is a fabric " +
+				// thisProductCatgory);
 				return (true);
 			} else {
-//				System.out.println("This category is Not fabric " + thisProductCatgory);
+				// System.out.println("This category is Not fabric " +
+				// thisProductCatgory);
 				fabricCategories.remove(thisProductCatgory);
 			}
 		}
@@ -79,8 +108,8 @@ public class CheckProductTable {
 	}
 
 	private static void processCSVfile(String fileIn) throws IOException {
-		File file = new File("/Users/geoffn/Downloads/testOut.csv");
-		Writer writer = new OutputStreamWriter(new FileOutputStream(file), Charset.forName("UTF-8")); //$NON-NLS-1$
+		File outFile = new File(outCSVFileName);
+		Writer writer = new OutputStreamWriter(new FileOutputStream(outFile), Charset.forName("UTF-8")); //$NON-NLS-1$
 		CSVPrinter printer = new CSVPrinter(writer, CSVFormat.EXCEL);
 		// printer.println();
 		boolean firstTimeThrough = true;
@@ -109,12 +138,8 @@ public class CheckProductTable {
 			// firstTimeThrough = false;
 			if ((record.size() < 29)) {
 				shortRecords++;
-				// System.out.println(record);
-				// System.out
-				// .println("Internal ID(Do Not Change)" + " |" +
-				// record.get("Internal ID(Do Not Change)") + "|");
-				// System.out.println("Status" + " |" + record.get("Status") +
-				// "|");
+				// printer.print("=\"" + "Short Record" + "\"");
+				// printer.printRecord(record);
 			} else {
 				// Write Description to a new browser window
 				if (record.get("Short Description").contains(BadChar)) {
@@ -124,14 +149,15 @@ public class CheckProductTable {
 				if (prevInternalID.equals(record.get("Internal ID(Do Not Change)"))) {
 					internalIDIgnored++;
 				} else {
-//					System.out.println("prevInternalID is '" + prevInternalID + "'");
-//					System.out.println("currInternalID is '" + record.get("Internal ID(Do Not Change)") + "'");
+					// System.out.println("prevInternalID is '" + prevInternalID
+					// + "'");
+					// System.out.println("currInternalID is '" +
+					// record.get("Internal ID(Do Not Change)") + "'");
 					prevInternalID = record.get("Internal ID(Do Not Change)");
 					boolean needsUpdating = checkThisProduct(record.get("Internal ID(Do Not Change)"),
 							record.get("Category IDs (Comma separate)"), record.get("Dept Code"), record.get("Status"),
 							record.get("Product Title"), record.get("Short Description"),
-							// record.get("Long Description"),
-							record.get("Unit of Measurement(each/per yard)"),
+							record.get("Long Description"), record.get("Unit of Measurement(each/per yard)"),
 							record.get("Availability(web/store/both)"), record.get(10),
 							record.get("Unlimited Inventory(yes/no)"), record.get("Options"),
 							record.get("Assigned option values"), record.get("Option ID(Do Not Change)"),
@@ -145,6 +171,7 @@ public class CheckProductTable {
 						needsUpdatingcount++;
 						printer.print("=\"" + errorMessages + "\"");
 						printer.printRecord(record);
+						
 					}
 				}
 			}
@@ -154,34 +181,76 @@ public class CheckProductTable {
 		System.out.println("number of short records was " + shortRecords);
 		System.out.println("products to be updated is  " + needsUpdatingcount);
 		System.out.println("Product Option lines ignored " + internalIDIgnored);
-		System.out.println("categoryIdEmpty     : " + categoryIdEmpty);
-		System.out.println("DeptCodeEmpty       : " + deptCodeEmpty);
-		System.out.println("statusIsEmpty       : " + statusIsEmpty);
-		System.out.println("weightIsEmpty       : " + weightIsEmpty);
-		System.out.println("ProductTitleIsEmpty : " + ProductTitleIsEmpty);
-		
+		System.out.println("categoryIdEmpty          : " + categoryIdEmpty);
+		System.out.println("DeptCodeEmpty            : " + deptCodeEmpty);
+		System.out.println("statusIsEmpty            : " + statusIsEmpty);
+		System.out.println("weightIsEmpty            : " + weightIsEmpty);
+		System.out.println("ProductTitleIsEmpty      : " + ProductTitleIsEmpty);
+		System.out.println("badCharInDescription     : " + badCharInDescription);
 		System.out.println("nonFabricMeasuredPerYard : " + nonFabricMeasuredPerYard);
+		System.out.println("fabricNotMeasuredPerYard : " + fabricNotMeasuredPerYard);
+		System.out.println("counterShortWithHtml     : " + counterShortDescHasHtml);
+		
 		writer.close();
-		System.exit(1);
 	}
 
-	private static void displayInBrowser(String inString) {
+	private static void displayInBrowser(String internalID, String sku, String shortDesc, String longDesc) {
 		// TODO Auto-generated method stub
-		File file = new File("test.html");
+		// File file = new File("test.html");
 		try {
-			Files.write(file.toPath(), inString.getBytes());
-			Desktop.getDesktop().browse(file.toURI());
-			System.exit(1);
+			File htmlFile = new File(htmlShortFileName);
+			String separator = "\n<br>----------"+"("+shortDesc.length()+")"+"--------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
+					+ " sku:" + sku + "<br>";
+			Files.write(htmlFile.toPath(), separator.getBytes(), StandardOpenOption.APPEND);
+			Files.write(htmlFile.toPath(), shortDesc.getBytes(), StandardOpenOption.APPEND);
+			browserDisplayCount++;
+			// int k=0;
+			// if ((k = browserDisplayCount % 100)==1){
+			// Desktop.getDesktop().browse(file.toURI());
+			// BufferedReader reader = new BufferedReader(new
+			// InputStreamReader(System.in));
+			// System.out.println("Please press enter to move to the next
+			// display");
+			// String tablename = null;
+			// try {
+			// tablename = reader.readLine();
+			// } catch (IOException e) {
+			// e.printStackTrace();
+			// }
+			// }
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 		}
-
+		try {
+			File htmlFile = new File(htmlLongFileName);
+			String separator = "\n\n<br>------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
+					+ " sku:" + sku + "<br>";
+			Files.write(htmlFile.toPath(), separator.getBytes(), StandardOpenOption.APPEND);
+			Files.write(htmlFile.toPath(), longDesc.getBytes(), StandardOpenOption.APPEND);
+			browserDisplayCount++;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+		}
+		String Html;
+		if (shortDesc.contains("<")){
+			try {
+				File htmlFile = new File(trucatedShortFileName);
+				String separator = "\n<br>----regexHTML------------------------------------------------------------------------------------------------------"
+						+ " sku:" + sku + "<br><p>";
+				Files.write(htmlFile.toPath(), separator.getBytes(), StandardOpenOption.APPEND);
+				Files.write(htmlFile.toPath(), shortDesc.getBytes(), StandardOpenOption.APPEND);
+				counterShortDescHasHtml++;
+//				Files.write(htmlFile.toPath(), shortDesc.replaceAll("/<[^>]*>/g", " ").replaceAll("/\\{2,}/g", " ").trim().getBytes(), StandardOpenOption.APPEND);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+			}
+		}
+		
 	}
 
 	private static boolean checkThisProduct(String InternalID, String CategoryIDs, String DeptCode, String Status,
-			String ProductTitle, String ShortDescription,
-			// String LongDescription,
-			String UnitOfMeasurement, String Availability, String string10, String UnlimitedInventory, String Options,
+			String ProductTitle, String ShortDescription, String LongDescription, String UnitOfMeasurement,
+			String Availability, String string10, String UnlimitedInventory, String Options,
 			String AssignedOptionValues, String OptionID, String sku, String upc, String ManufacturerProductId,
 			String AlternateLookups, String ManufacturerId, String PreferredVendor, String StoreLocationID,
 			String Weight, String Price, String SalePrice, String WholesalePrice, String WebSitePrice,
@@ -208,10 +277,10 @@ public class CheckProductTable {
 			errorMessages = errorMessages + "Status.isEmpty, ";
 			statusIsEmpty++;
 		}
-		 if (ProductTitle.isEmpty()) {
-		 errorMessages = errorMessages + "ProductTitle.isEmpty, ";
-		 ProductTitleIsEmpty++;
-		 }
+		if (ProductTitle.isEmpty()) {
+			errorMessages = errorMessages + "ProductTitle.isEmpty, ";
+			ProductTitleIsEmpty++;
+		}
 		// if (UnlimitedInventory.isEmpty()) {
 		// errorMessages = errorMessages + "UnlimitedInventory.isEmpty, ";
 		// }
@@ -219,9 +288,11 @@ public class CheckProductTable {
 			errorMessages = errorMessages + "Weight.isEmpty, ";
 			weightIsEmpty++;
 		}
-		if (ShortDescription.contains(BadChar)) {
-			errorMessages = errorMessages + "ShortDescription contains badchar, ";
-		}
+//		if (ShortDescription.contains(BadChar)) {
+//			errorMessages = errorMessages + "ShortDescription contains badchar, ";
+//			badCharInDescription++;
+//		}
+		displayInBrowser(InternalID, sku, ShortDescription, LongDescription);
 		// if (LongDescription.contains(BadChar)){
 		// errorMessages=errorMessages+"LongDescription contains badchar, ";
 		// }
@@ -235,6 +306,7 @@ public class CheckProductTable {
 					|| ShortDescription.contains("Layer Cake") || ShortDescription.contains("pre cut")) {
 			} else
 				errorMessages = errorMessages + "Fabric is not measured per yard, ";
+			fabricNotMeasuredPerYard++;
 		}
 		if (!productIsFabric(CategoryIDs) && UnitOfMeasurement.contains("per yard")) {
 			errorMessages = errorMessages + "non-Fabric is measured per yard, ";
@@ -243,7 +315,7 @@ public class CheckProductTable {
 		if (errorMessages.length() == 1) {
 			return false;
 		} else {
-			System.out.println(errorMessages);
+			// System.out.println(errorMessages);
 			return true;
 		}
 	}
@@ -265,7 +337,8 @@ public class CheckProductTable {
 	}
 
 	private static String chooseCSVfile() {
-		return "/Users/geoffn/Downloads/4872-edit-products-48.csv";
+		return inCSVFileName;
+		// "/Users/geoffn/Downloads/4872-edit-products-48.csv";
 
 	}
 }// end FirstExample
